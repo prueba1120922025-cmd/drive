@@ -2,32 +2,19 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Gestor Avanzado de Notas Google Drive</title>
+<title>App mínima de notas Google Drive</title>
 <style>
-  body { font-family: Arial; padding: 20px; background: #f5f5f5; }
-  textarea { width: 100%; height: 150px; margin-bottom: 10px; }
-  button { margin: 5px; padding: 8px 16px; }
+  body { font-family: Arial; padding: 20px; }
+  button { margin: 5px; padding: 10px 20px; }
   #status { margin-top: 10px; color: green; }
-  #notesList { margin-top: 10px; list-style: none; padding: 0; }
-  #notesList li { padding: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
-  #notesList li:hover { background: #e0e0e0; }
 </style>
 </head>
 <body>
 
-<h2>Gestor Avanzado de Notas Google Drive</h2>
+<h2>App mínima de notas Google Drive</h2>
 
 <button id="login-btn" disabled>Iniciar sesión</button>
-<button id="logout-btn" disabled>Cerrar sesión</button>
-
-<div>
-  <textarea id="note" placeholder="Escribe tu nota aquí..."></textarea><br>
-  <button id="create-btn" disabled>Crear nota</button>
-  <button id="update-btn" disabled>Actualizar nota</button>
-</div>
-
-<h3>Notas creadas</h3>
-<ul id="notesList"></ul>
+<button id="create-btn" disabled>Crear nota</button>
 
 <div id="status"></div>
 
@@ -41,10 +28,8 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 let tokenClient;
 let gapiInited = false;
 let gisInited = false;
-let selectedFileId = null;
-let autoSaveTimeout = null;
 
-// ----- Inicialización -----
+// Inicializar GAPI
 function gapiLoaded() { gapi.load('client', initializeGapiClient); }
 async function initializeGapiClient() {
   await gapi.client.init({
@@ -55,11 +40,12 @@ async function initializeGapiClient() {
   maybeEnableButtons();
 }
 
+// Inicializar Google Identity
 function gisLoaded() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
-    callback: '', // callback asignado luego
+    callback: '', 
   });
   gisInited = true;
   maybeEnableButtons();
@@ -68,42 +54,31 @@ function gisLoaded() {
 function maybeEnableButtons() {
   if (gapiInited && gisInited) {
     document.getElementById('login-btn').disabled = false;
-    document.getElementById('logout-btn').disabled = false;
     document.getElementById('create-btn').disabled = false;
-    document.getElementById('update-btn').disabled = false;
 
-    // Asignar eventos solo cuando todo está listo
     document.getElementById('login-btn').onclick = login;
-    document.getElementById('logout-btn').onclick = logout;
     document.getElementById('create-btn').onclick = createNote;
-    document.getElementById('update-btn').onclick = updateNote;
   }
 }
 
-// ----- Funciones principales -----
-async function login() {
-  tokenClient.callback = async (resp) => {
-    if (resp.error) throw(resp);
+// Login
+function login() {
+  tokenClient.callback = (resp) => {
+    if (resp.error) {
+      document.getElementById('status').innerText = 'Error al iniciar sesión';
+      return;
+    }
     document.getElementById('status').innerText = 'Conectado a Google Drive';
-    listNotes();
   };
   tokenClient.requestAccessToken({ prompt: 'consent' });
 }
 
-function logout() {
-  google.accounts.oauth2.revoke(tokenClient.access_token);
-  tokenClient.access_token = null;
-  selectedFileId = null;
-  document.getElementById('status').innerText = 'Desconectado';
-  document.getElementById('notesList').innerHTML = '';
-  document.getElementById('note').value = '';
-}
-
-// Crear nota como Google Doc
+// Crear nota simple
 async function createNote() {
-  const content = document.getElementById('note').value;
-  const fileMetadata = { name: 'MiNota', mimeType: 'application/vnd.google-apps.document' };
+  const fileMetadata = { name: 'MiNotaMinima', mimeType: 'application/vnd.google-apps.document' };
+  const content = 'Esta es una nota de prueba';
   const file = new Blob([content], { type: 'text/plain' });
+
   const form = new FormData();
   form.append("metadata", new Blob([JSON.stringify(fileMetadata)], { type: "application/json" }));
   form.append("file", file);
@@ -114,74 +89,7 @@ async function createNote() {
     body: form
   });
   const data = await response.json();
-  selectedFileId = data.id;
-  document.getElementById('status').innerText = 'Nota creada con ID: ' + selectedFileId;
-  listNotes();
-}
-
-// Actualizar nota
-async function updateNote() {
-  if (!selectedFileId) return alert('Selecciona primero una nota de la lista');
-  const content = document.getElementById('note').value;
-  const file = new Blob([content], { type: 'text/plain' });
-  const form = new FormData();
-  form.append("file", file);
-
-  await fetch(`https://www.googleapis.com/upload/drive/v3/files/${selectedFileId}?uploadType=media`, {
-    method: "PATCH",
-    headers: { "Authorization": "Bearer " + gapi.client.getToken().access_token },
-    body: form
-  });
-  document.getElementById('status').innerText = 'Nota actualizada';
-}
-
-// Autoguardado
-document.getElementById('note').addEventListener('input', () => {
-  if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
-  autoSaveTimeout = setTimeout(() => { if(selectedFileId) updateNote(); }, 5000);
-});
-
-// Listar notas por fecha de creación
-async function listNotes() {
-  const response = await gapi.client.drive.files.list({
-    pageSize: 50,
-    fields: "files(id, name, createdTime, mimeType)",
-    q: "mimeType='application/vnd.google-apps.document' and 'me' in owners",
-    orderBy: "createdTime desc"
-  });
-
-  const notesList = document.getElementById('notesList');
-  notesList.innerHTML = '';
-  response.result.files.forEach(file => {
-    const li = document.createElement('li');
-    li.innerHTML = `<span>${file.name}</span> <button data-id="${file.id}">Borrar</button>`;
-    li.querySelector('span').onclick = () => loadNote(file.id);
-    li.querySelector('button').onclick = () => deleteNote(file.id);
-    notesList.appendChild(li);
-  });
-}
-
-// Cargar nota
-async function loadNote(fileId) {
-  const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=text/plain`, {
-    headers: { "Authorization": "Bearer " + gapi.client.getToken().access_token }
-  });
-  const text = await response.text();
-  document.getElementById('note').value = text;
-  selectedFileId = fileId;
-  document.getElementById('status').innerText = 'Nota cargada';
-}
-
-// Borrar nota
-async function deleteNote(fileId) {
-  if (!confirm('¿Seguro que quieres borrar esta nota?')) return;
-  await gapi.client.drive.files.delete({ fileId });
-  document.getElementById('status').innerText = 'Nota borrada';
-  if (selectedFileId === fileId) {
-    selectedFileId = null;
-    document.getElementById('note').value = '';
-  }
-  listNotes();
+  document.getElementById('status').innerText = 'Nota creada con ID: ' + data.id;
 }
 
 // Inicializar
