@@ -17,13 +17,13 @@
 
 <h2>Gestor Avanzado de Notas Google Drive</h2>
 
-<button id="login-btn">Iniciar sesión</button>
-<button id="logout-btn">Cerrar sesión</button>
+<button id="login-btn" disabled>Iniciar sesión</button>
+<button id="logout-btn" disabled>Cerrar sesión</button>
 
 <div>
   <textarea id="note" placeholder="Escribe tu nota aquí..."></textarea><br>
-  <button id="create-btn">Crear nota</button>
-  <button id="update-btn">Actualizar nota</button>
+  <button id="create-btn" disabled>Crear nota</button>
+  <button id="update-btn" disabled>Actualizar nota</button>
 </div>
 
 <h3>Notas creadas</h3>
@@ -44,6 +44,7 @@ let gisInited = false;
 let selectedFileId = null;
 let autoSaveTimeout = null;
 
+// ----- Inicialización -----
 function gapiLoaded() { gapi.load('client', initializeGapiClient); }
 async function initializeGapiClient() {
   await gapi.client.init({
@@ -58,37 +59,48 @@ function gisLoaded() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
-    callback: '',
+    callback: '', // callback asignado luego
   });
   gisInited = true;
   maybeEnableButtons();
 }
 
 function maybeEnableButtons() {
-  if (gapiInited && gisInited) document.getElementById('login-btn').disabled = false;
+  if (gapiInited && gisInited) {
+    document.getElementById('login-btn').disabled = false;
+    document.getElementById('logout-btn').disabled = false;
+    document.getElementById('create-btn').disabled = false;
+    document.getElementById('update-btn').disabled = false;
+
+    // Asignar eventos solo cuando todo está listo
+    document.getElementById('login-btn').onclick = login;
+    document.getElementById('logout-btn').onclick = logout;
+    document.getElementById('create-btn').onclick = createNote;
+    document.getElementById('update-btn').onclick = updateNote;
+  }
 }
 
-// Login y logout
-document.getElementById('login-btn').onclick = () => {
+// ----- Funciones principales -----
+async function login() {
   tokenClient.callback = async (resp) => {
     if (resp.error) throw(resp);
     document.getElementById('status').innerText = 'Conectado a Google Drive';
     listNotes();
   };
   tokenClient.requestAccessToken({ prompt: 'consent' });
-};
+}
 
-document.getElementById('logout-btn').onclick = () => {
+function logout() {
   google.accounts.oauth2.revoke(tokenClient.access_token);
   tokenClient.access_token = null;
   selectedFileId = null;
   document.getElementById('status').innerText = 'Desconectado';
   document.getElementById('notesList').innerHTML = '';
   document.getElementById('note').value = '';
-};
+}
 
-// Crear nota
-document.getElementById('create-btn').onclick = async () => {
+// Crear nota como Google Doc
+async function createNote() {
   const content = document.getElementById('note').value;
   const fileMetadata = { name: 'MiNota', mimeType: 'application/vnd.google-apps.document' };
   const file = new Blob([content], { type: 'text/plain' });
@@ -105,11 +117,11 @@ document.getElementById('create-btn').onclick = async () => {
   selectedFileId = data.id;
   document.getElementById('status').innerText = 'Nota creada con ID: ' + selectedFileId;
   listNotes();
-};
+}
 
 // Actualizar nota
 async function updateNote() {
-  if (!selectedFileId) return;
+  if (!selectedFileId) return alert('Selecciona primero una nota de la lista');
   const content = document.getElementById('note').value;
   const file = new Blob([content], { type: 'text/plain' });
   const form = new FormData();
@@ -123,10 +135,10 @@ async function updateNote() {
   document.getElementById('status').innerText = 'Nota actualizada';
 }
 
-// Guardado automático cada 5 segundos
+// Autoguardado
 document.getElementById('note').addEventListener('input', () => {
   if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
-  autoSaveTimeout = setTimeout(updateNote, 5000);
+  autoSaveTimeout = setTimeout(() => { if(selectedFileId) updateNote(); }, 5000);
 });
 
 // Listar notas por fecha de creación
@@ -172,6 +184,7 @@ async function deleteNote(fileId) {
   listNotes();
 }
 
+// Inicializar
 gapiLoaded();
 </script>
 <script async defer onload="gisLoaded()"></script>
