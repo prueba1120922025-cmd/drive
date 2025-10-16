@@ -1,11 +1,10 @@
 const CLIENT_ID = '275477780459-hqq1r65323se19oj02qivn426v51eft3.apps.googleusercontent.com';
 const API_KEY = 'AIzaSyBBbeJdA-opqLE6ix_UbKGblzZB1S-xfJ0';
-const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+const SCOPES = 'https://www.googleapis.com/auth/drive.metadata.readonly';
 
 let tokenClient;
 let gapiInited = false;
 let gisInited = false;
-let fileId = null;
 
 // 1️⃣ Inicializar Google API
 function gapiLoaded() {
@@ -21,11 +20,12 @@ async function initializeGapiClient() {
   maybeEnableButtons();
 }
 
+// 2️⃣ Inicializar el cliente de OAuth
 function gisLoaded() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
-    callback: '', // Callback asignado dinámicamente
+    callback: '', // se asignará al iniciar sesión
   });
   gisInited = true;
   maybeEnableButtons();
@@ -36,57 +36,50 @@ function maybeEnableButtons() {
     document.getElementById('login-btn').disabled = false;
 }
 
-// 2️⃣ Login y logout
+// 3️⃣ Iniciar sesión
 document.getElementById('login-btn').onclick = () => {
   tokenClient.callback = async (resp) => {
     if (resp.error) throw (resp);
     document.getElementById('status').innerText = 'Conectado a Google Drive';
+    await listarArchivos();
   };
   tokenClient.requestAccessToken({ prompt: 'consent' });
 };
 
+// 4️⃣ Cerrar sesión
 document.getElementById('logout-btn').onclick = () => {
   google.accounts.oauth2.revoke(tokenClient.access_token);
   tokenClient.access_token = null;
-  fileId = null;
   document.getElementById('status').innerText = 'Desconectado';
+  document.querySelector("#file-table tbody").innerHTML = "";
 };
 
-// 3️⃣ Crear archivo
-document.getElementById('create-btn').onclick = async () => {
-  const content = document.getElementById('note').value;
-  const fileMetadata = { name: 'MiNota.txt', mimeType: 'text/plain' };
-  const media = { mimeType: 'text/plain', body: content };
-  const response = await gapi.client.drive.files.create({
-    resource: fileMetadata,
-    media: media,
-    fields: 'id'
-  });
-  fileId = response.result.id;
-  document.getElementById('status').innerText = 'Nota creada con ID: ' + fileId;
-};
+// 5️⃣ Listar archivos
+async function listarArchivos() {
+  try {
+    const res = await gapi.client.drive.files.list({
+      pageSize: 20,
+      fields: 'files(id, name, mimeType)'
+    });
 
-// 4️⃣ Leer archivo
-document.getElementById('load-btn').onclick = async () => {
-  if (!fileId) return alert('Primero crea o indica el ID de un archivo');
-  const response = await gapi.client.drive.files.get({
-    fileId: fileId,
-    alt: 'media'
-  });
-  document.getElementById('note').value = response.body;
-  document.getElementById('status').innerText = 'Nota cargada';
-};
+    const files = res.result.files;
+    const tbody = document.querySelector("#file-table tbody");
+    tbody.innerHTML = "";
 
-// 5️⃣ Actualizar archivo
-document.getElementById('update-btn').onclick = async () => {
-  if (!fileId) return alert('Primero crea o indica el ID de un archivo');
-  const content = document.getElementById('note').value;
-  const media = { mimeType: 'text/plain', body: content };
-  await gapi.client.drive.files.update({
-    fileId: fileId,
-    media: media
-  });
-  document.getElementById('status').innerText = 'Nota actualizada';
-};
+    if (!files || files.length === 0) {
+      tbody.innerHTML = "<tr><td colspan='2'>No hay archivos</td></tr>";
+      return;
+    }
+
+    files.forEach(file => {
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>${file.name}</td><td>${file.mimeType}</td>`;
+      tbody.appendChild(row);
+    });
+  } catch (err) {
+    console.error("Error al listar archivos:", err);
+    document.getElementById('status').innerText = 'Error al listar archivos';
+  }
+}
 
 gapiLoaded();
