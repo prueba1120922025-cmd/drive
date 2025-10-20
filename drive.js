@@ -6,7 +6,7 @@ let tokenClient;
 let gapiInited = false;
 let gisInited = false;
 
-// 1️⃣ Inicializar Google API
+// Inicializar Google API
 function gapiLoaded() {
   gapi.load('client', initializeGapiClient);
 }
@@ -20,7 +20,7 @@ async function initializeGapiClient() {
   maybeEnableButtons();
 }
 
-// 2️⃣ Inicializar el cliente de OAuth
+// Inicializar el cliente de OAuth
 function gisLoaded() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
@@ -36,7 +36,7 @@ function maybeEnableButtons() {
     document.getElementById('login-btn').disabled = false;
 }
 
-// 3️⃣ Iniciar sesión
+// Iniciar sesión
 document.getElementById('login-btn').onclick = () => {
   tokenClient.callback = async (resp) => {
     if (resp.error) throw (resp);
@@ -46,7 +46,7 @@ document.getElementById('login-btn').onclick = () => {
   tokenClient.requestAccessToken({ prompt: 'consent' });
 };
 
-// 4️⃣ Cerrar sesión
+// Cerrar sesión
 document.getElementById('logout-btn').onclick = () => {
   google.accounts.oauth2.revoke(tokenClient.access_token);
   tokenClient.access_token = null;
@@ -54,7 +54,7 @@ document.getElementById('logout-btn').onclick = () => {
   document.querySelector("#file-table tbody").innerHTML = "";
 };
 
-// 5️⃣ Listar archivos
+// Listar archivos
 async function listarArchivos() {
   try {
     const res = await gapi.client.drive.files.list({

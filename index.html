@@ -6,15 +6,10 @@
   <link rel="stylesheet" href="estilos.css">
 </head>
 <body>
-
-  <h2>Mis archivos en Google Drive</h2>
-
-  <button id="login-btn" disabled>Iniciar sesión</button>
-  <button id="logout-btn">Cerrar sesión</button>
-
-  <div id="status"></div>
-
-  <table id="file-table">
+  <nav id="BarraSuperior">
+    <button id="BotonInicioSesion">Iniciar sesón</button>
+  </nav>
+  <table id="TablaArchivos">
     <thead>
       <tr>
         <th>Nombre del archivo</th>
@@ -25,7 +20,7 @@
   </table>
 
   <script src="https://apis.google.com/js/api.js"></script>
-    <script src="drive.js"></script>
+  <script src="drive.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer onload="gisLoaded()"></script>
 </body>
 </html>
